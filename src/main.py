@@ -3,7 +3,7 @@ import tkinter as tk
 from constants import *
 import json
 from pystray import Icon, Menu, MenuItem
-from PIL import Image
+from PIL import Image, ImageTk
 import threading
 
 # ---- Variables ---- #
@@ -21,8 +21,12 @@ root.geometry("400x600")
 root.minsize(350, 500)
 root.configure(bg=BG)
 
-# ---- Show / Hide the window ---- #
+icon_pil = Image.open(CLEAR_PATH)
+icon_img = ImageTk.PhotoImage(icon_pil)
 
+root.iconphoto(False, icon_img)
+
+# ---- Show / Hide the window ---- #
 def show_window(icon, item):
     root.after(0, root.deiconify)
 
@@ -118,6 +122,32 @@ status.pack(side="bottom", fill="x")
 search_box.pack(fill="x", padx=10, pady=5)
 listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
+# ---- Pin Functionality ---- #
+def pin_selected(event=None):
+    selected = listbox.curselection()
+    if not selected:
+        return
+
+    idx = selected[0]
+    item = history[idx]
+
+    # toggle pinned
+    item["pinned"] = not item["pinned"]
+
+    save_history()
+    refresh_listbox()
+
+# ---- Refresh Function (IMPORTANT!) ---- #
+def refresh_listbox():
+    listbox.delete(0, tk.END)
+
+    # pinned first
+    sorted_history = sorted(history, key=lambda x: not x.get("pinned", False))
+
+    for item in sorted_history:
+        prefix = "📌 " if item.get("pinned") else ""
+        listbox.insert(tk.END, prefix + item["text"])
+
 # ---- Saving Functions ---- #
 def save_history():
     with open(DB_PATH, "w", encoding="utf-8") as file:
@@ -129,10 +159,18 @@ def load_history():
 
     try:
         with open(DB_PATH, "r", encoding="utf-8") as file:
-            history = json.load(file)
+            raw = json.load(file)
 
-        for item in history:
-            listbox.insert(tk.END, item)
+        history = []
+
+        for item in raw:
+            # if old format (string), convert it
+            if isinstance(item, str):
+                history.append({"text": item, "pinned": False})
+            else:
+                history.append(item)
+
+        refresh_listbox()
 
     except FileNotFoundError:
         history = []
@@ -150,21 +188,21 @@ def delete_clip(event):
     
     print(selected)
     del history[selected]
-    listbox.delete(selected)
 
     save_history()
-    search_history()
+    refresh_listbox()
 
 # ---- Search Function ---- #
 
 def search_history(*args):
     query = search_var.get().lower()
-
     listbox.delete(0, tk.END)
 
     for item in history:
-        if query in item.lower():
-            listbox.insert(tk.END, item)
+        text = item["text"]
+        if query in text.lower():
+            prefix = "📌 " if item.get("pinned") else ""
+            listbox.insert(tk.END, prefix + text)
 
 
 # ---- Main Functionality ---- #
@@ -183,7 +221,8 @@ def check_clipboard():
             history.remove(current)
             print(history)
 
-        history.insert(0, current)
+        entry = {"text": current, "pinned": False}
+        history.insert(0, entry)
         listbox.insert(0, current)
 
         save_history()
@@ -220,6 +259,7 @@ threading.Thread(
 
 listbox.bind("<Double-Button-1>", on_select)
 search_var.trace_add("write", search_history)
+pin_button.bind("<Button-1>", pin_selected)
 delete_button.bind("<Button-1>", delete_clip)
 
 load_history()
