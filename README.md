@@ -14,7 +14,11 @@ By implementing pinning of certain entries and the deletion of certain entries, 
 
     🧰 Accessible from the toolbar
 
+    🔍️ Search bar for looking through entries
+
     📦️ Always backed up a .json file so it doesn't corrupt
+
+    🦆 Orange / Black duck based aesthetic
 
 **Supported Platforms:**
 
